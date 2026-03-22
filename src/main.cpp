@@ -37,10 +37,10 @@ OTAZKY:
         hlavni vlakno potom spawne nove vlakno s posunutim?
 */
 
-const int sdr_rate = 2400000;
+const int sdr_rate = 2048000;
 const int audio_rate = 48000;
 const int decimation = sdr_rate / audio_rate;
-const int gain = 16000;
+const int gain = 32000;
 const int CHUNK_SIZE = 1024;
 
 
@@ -127,6 +127,60 @@ class Sender{
 
 };
 
+class FIRFilter
+{
+    private:
+        std::vector<float> taps = {0.000795f, 0.000769f, 0.000725f, 0.000637f, 0.000465f, 0.000165f, -0.000303f, -0.000967f, -0.001834f, -0.002883f, -0.004055f, -0.005254f, -0.006346f, -0.007169f, -0.007535f, -0.007250f, -0.006130f, -0.004014f, -0.000785f, 0.003612f, 0.009164f, 0.015778f, 0.023280f, 0.031421f, 0.039888f, 0.048321f, 0.056333f, 0.063538f, 0.069575f, 0.074131f, 0.076965f, 0.077927f, 0.076965f, 0.074131f, 0.069575f, 0.063538f, 0.056333f, 0.048321f, 0.039888f, 0.031421f, 0.023280f, 0.015778f, 0.009164f, 0.003612f, -0.000785f, -0.004014f, -0.006130f, -0.007250f, -0.007535f, -0.007169f, -0.006346f, -0.005254f, -0.004055f, -0.002883f, -0.001834f, -0.000967f, -0.000303f, 0.000165f, 0.000465f, 0.000637f, 0.000725f, 0.000769f, 0.000795f};
+        //taps napocitane na cutoff 100kHz a sample rate 2.4M 
+        std::vector<float> buffer_i;   // Historie I vzorku
+        std::vector<float> buffer_q;   // Historie Q vzorku
+        int head;                      // Ukazatel na nejnovejsi vzorek
+        int num_taps;                  // Pocet koeficientu
+    public:
+        FIRFilter()
+        {
+            num_taps = taps.size();
+            buffer_i.assign(num_taps * 2,0.0f);
+            buffer_q.assign(num_taps * 2,0.0f);
+            head = 0;
+        }
+        void process(float &i, float &q)
+        {
+            buffer_i[head] = i;
+            buffer_i[head + num_taps] = i;
+            buffer_q[head] = q;
+            buffer_q[head + num_taps] = q;
+
+            head = (head == 0) ? (num_taps - 1) : (head - 1);
+
+            float out_i = 0.0f;
+            float out_q = 0.0f;
+            const float* p_i = &buffer_i[head + 1];
+            const float* p_q = &buffer_q[head + 1];
+            const float* p_taps = taps.data();
+
+            // 2. Výpočet konvoluce (násobení zpožděných vzorků s koeficienty)
+            #pragma omp simd
+            #pragma GCC ivdep
+            for (int k = 0; k < num_taps; ++k)
+            {
+                out_i += p_i[k] * p_taps[k];
+                out_q += p_q[k] * p_taps[k];
+            }
+
+            // 3. Posun hlavy pro další vzorek
+            head++;
+            if (head >= num_taps)
+            {
+                head = 0;
+            }
+
+            // 4. Přepis původních hodnot přefiltrovaným výsledkem
+            i = out_i;
+            q = out_q;
+        }
+};
+
 class Channel{
     private:
         float freq_offset;
@@ -145,6 +199,7 @@ class Channel{
         float decim_tmp;
 
         Sender* sndr;
+        FIRFilter* filter;
 
         void mixFreq()
         {
@@ -169,7 +224,7 @@ class Channel{
 
             // unwrap phase difference
             if (delta > M_PI) delta -= 2.0f * M_PI;
-            if (delta < -M_PI) delta += 2.0f * M_PI;
+            else if (delta < -M_PI) delta += 2.0f * M_PI;
 
             last_phase = current_phase;
             return delta;
@@ -178,7 +233,7 @@ class Channel{
         {
             decim_tmp += demod;
             ++decim_cnt;
-            if(decimation == decim_cnt)
+            if(decimation <= decim_cnt)
             {
                 audio = decim_tmp / decimation;
                 decim_cnt = 0;
@@ -208,13 +263,15 @@ class Channel{
             decim_tmp = 0.0f;
             i = 0.0f; q = 0.0f;
             sndr = sender;
+            filter = new FIRFilter();
         }
         bool process(float i_in,float q_in)
         {
             i = i_in;
             q = q_in;
             mixFreq();
-            filterIQ();
+            //filterIQ();
+            filter->process(i, q);
             float audio;
             float scaled;
 
@@ -392,7 +449,7 @@ void httpServerLoop(int port)
                     workers.push_back(worker);
                 }
                 
-                response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nWorker started.";
+                response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nWorker started.\n";
             }
         }
         
