@@ -1,6 +1,7 @@
 #include "FIRFilter.hpp"
 #include "SDRParams.hpp"
 #include <cmath>
+#include <iostream>
 void FIRFilter::process(float &i, float &q)
 {
     buffer_i[head] = i;
@@ -21,15 +22,14 @@ void FIRFilter::process(float &i, float &q)
     const float* p_taps = taps.data();
 
     #pragma omp simd
-    #pragma GCC ivdep
     for (int k = 0; k < num_taps; ++k)
     {
         out_i += p_i[k] * p_taps[k];
         out_q += p_q[k] * p_taps[k];
     }
 
-    ++head;
-    if (head >= num_taps) head = 0;
+    //++head;
+    //if (head >= num_taps) head = 0;
 
     i = out_i;
     q = out_q;
@@ -41,6 +41,7 @@ void FIRFilter::generateFirTaps()
     float normalized_cutoff = SDRParams::fir_cutoff / SDRParams::sdr_rate;
     float sum = 0.0f;
     int M = num_taps - 1; // Řád filtru
+    taps.resize(num_taps); 
 
     for(int i = 0; i < num_taps; ++i)
     {
@@ -72,4 +73,10 @@ void FIRFilter::generateFirTaps()
     {
         taps[i] /= sum;
     }
+
+    for(auto t : taps)
+    {
+        std::cout << t << ", ";
+    }
+    std::cout << std::endl;
 }

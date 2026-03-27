@@ -25,5 +25,5 @@ class Sender{
                 close(listen_sock);
         }
         bool startServerAccept();
-        bool sendData(void* data, size_t size_data);
+        bool sendData(void* data, long size_data);
 };

@@ -4,12 +4,13 @@ void RadioWorker::threatLoop()
     sender = std::make_unique<Sender>(port);
     if(!sender->startServerAccept())
     {
+        std::cout << "bad\n";
         running = false;
         return;
     }
-
+    std::cout << "helo0\n";
     channel = std::make_unique<Channel>(offset, sender.get());
-
+    std::cout << "helo1\n";
     while(running)
     {
         std::shared_ptr<IQBlock> block;
@@ -25,17 +26,17 @@ void RadioWorker::threatLoop()
                 block = dataQueue.front();
                 dataQueue.pop();
             }
-            if(block)
+        }
+        if(block)
+        {
+            for(size_t k = 0; k < block->i_data.size(); ++k)
             {
-                for(size_t k = 0; k < block->i_data.size(); ++k)
+                // klient se odpojil
+                if(!channel->process(block->i_data[k], block->q_data[k]))
                 {
-                    // klient se odpojil
-                    if(!channel->process(block->i_data[k], block->q_data[k]))
-                    {
-                        std::cout << "[Worker " << port << "] Processing stopped (client disconnected)." << std::endl;
-                        running = false;
-                        break;
-                    }
+                    std::cout << "[Worker " << port << "] Processing stopped (client disconnected)." << std::endl;
+                    running = false;
+                    break;
                 }
             }
         }

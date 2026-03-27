@@ -4,6 +4,7 @@
 #include <mutex>
 #include <queue>
 #include <condition_variable>
+#include "SDRParams.hpp"
 #include "IQBlock.hpp"
 #include "Sender.hpp"
 #include "Channel.hpp"

@@ -4,6 +4,7 @@
 #include "SDRParams.hpp"
 #include <cmath>
 #include <algorithm>
+#include <vector>
 class Channel{
     private:
         float freq_offset;
@@ -25,12 +26,15 @@ class Channel{
         Sender* sndr;
         FIRFilter* filter;
 
+        std::vector<int16_t> audio_buffer;
+
         void mixFreq();
         float demod();
         bool decim(float demod, float& audio);
     public:
         Channel(float ch_offset, Sender* sender)
         {
+            std::cout << "channel start\n";
             freq_offset = ch_offset;
             phase_inc = 2.0f * M_PI * freq_offset / SDRParams::sdr_rate;
             lpf_alpha = 0.15f;
@@ -42,8 +46,11 @@ class Channel{
             decim_tmp = 0.0f;
             i = 0.0f; q = 0.0f;
             sndr = sender;
+            std::cout << "before fir\n";
             filter = new FIRFilter();
+            std::cout << "after fir\n";
             decimation = (int)(SDRParams::sdr_rate / SDRParams::audio_rate);
+            std::cout << decimation << std::endl;
         }
         bool process(float i_in,float q_in);
 };

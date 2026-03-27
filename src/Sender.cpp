@@ -44,7 +44,7 @@ bool Sender::startServerAccept()
 
     return true;
 }
-bool Sender::sendData(void* data, size_t size_data)
+bool Sender::sendData(void* data, long size_data)
 {
     if(conn_sock < 0)
         return false;

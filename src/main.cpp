@@ -120,11 +120,10 @@ void httpServerLoop(int port)
 
 int main()
 {
-    SDRParams::audio_rate = 2048000;
+    SDRParams::sdr_rate = 2400000;
     SDRParams::gain = 32000;
     SDRParams::audio_rate = 48000;
     SDRParams::fir_cutoff = 100000;
-
     std::thread httpThread(httpServerLoop, 8080);
     httpThread.detach();
 

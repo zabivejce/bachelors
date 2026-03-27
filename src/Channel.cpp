@@ -1,5 +1,5 @@
 #include "Channel.hpp"
-#include "SDRParams.hpp"
+#include <cstdint>
 
 void Channel::mixFreq()
 {
@@ -64,9 +64,12 @@ bool Channel::process(float i_in,float q_in)
     {
         scaled = audio * SDRParams::gain;
         int16_t sample = static_cast<int16_t>(std::clamp(scaled, -32767.0f, 32767.0f));
-        if(sndr)
+        audio_buffer.emplace_back(sample);
+        if(sndr && audio_buffer.size() >= 512)
         {
-            return sndr->sendData(&sample,sizeof(sample));
+            bool status = sndr->sendData(audio_buffer.data(),audio_buffer.size() * sizeof(int16_t));
+            audio_buffer.clear();
+            return status;
         }
     }
     return true;

@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <cmath>
+#include <iostream>
 #include "SDRParams.hpp"
 class FIRFilter
 {
