@@ -13,7 +13,6 @@ class Sender{
         int listen_sock;
         int conn_sock;
         int port;
-        int sendCnt = 0;
     public:
         Sender(int port)
         {

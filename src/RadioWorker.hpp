@@ -22,7 +22,7 @@ class RadioWorker
         std::mutex queueMutex;
         std::condition_variable queueCv;
 
-        const size_t MAX_QUEUE_SIZE = 50; 
+        const size_t MAX_QUEUE_SIZE = 256; 
 
         void threatLoop();
     public:

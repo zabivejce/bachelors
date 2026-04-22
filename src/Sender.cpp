@@ -69,7 +69,7 @@ bool Sender::startServerAccept()
     std::memcpy(wav_header + 40, &data_size, 4);
 
     // Odeslání hlavičky ihned po úspěšném navázání spojení
-    //send(conn_sock, wav_header, 44, MSG_NOSIGNAL);
+    send(conn_sock, wav_header, 44, MSG_NOSIGNAL);
     // ====================================
 
     return true;
@@ -81,15 +81,6 @@ bool Sender::sendData(void* data, long size_data)
     //ssize_t muze ulozit i -1 [more you know :)]
     //ssize_t n_bytes = write(conn_sock, data, size_data);
     ssize_t n_bytes = send(conn_sock, data, size_data, MSG_NOSIGNAL);
-    sendCnt += size_data;
-    if(sendCnt >= 480000)
-    {
-        sendCnt = 0;
-        auto now = std::chrono::system_clock::now();
-        time_t unix_time = std::chrono::system_clock::to_time_t(now);
-
-        std::cout << "cas: " << unix_time << std::endl;
-    }
     if(n_bytes != size_data)
     {
         std::cout << "client disconnected" << std::endl;
