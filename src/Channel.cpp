@@ -16,10 +16,10 @@ void Channel::mixFreq()
     if(phase < -2.0f * M_PI)
         phase += 2.0f * M_PI;
 }
-float Channel::demod()
+float Channel::demod(float i_dem, float q_dem)
 {
     //polar discriminant
-    float current_phase = std::atan2(q, i);
+    float current_phase = std::atan2(q_dem, i_dem);
     float delta = current_phase - last_phase;
 
     // unwrap phase difference
@@ -42,15 +42,6 @@ bool Channel::decim(float demod, float& audio)
     }
     return false;
 }
-/*
-void filterIQ()
-{
-    i = lpf_i + lpf_alpha * (i - lpf_i);
-    q = lpf_q + lpf_alpha * (q - lpf_q);
-    lpf_i = i;
-    lpf_q = q;
-}
-*/
 bool Channel::process(float i_in,float q_in)
 {
     i = i_in;
@@ -59,9 +50,16 @@ bool Channel::process(float i_in,float q_in)
     filter->process(i, q);
     float audio;
     float scaled;
+    ++decim_cnt;
+    sum_i += i;
+    sum_q += q;
 
-    if(decim(demod(), audio))
+    if(decim_cnt >= decimation)
     {
+        audio = demod(sum_i, sum_q);
+        decim_cnt = 0;
+        sum_i = 0;
+        sum_q = 0;
         scaled = audio * SDRParams::gain;
         int16_t sample = static_cast<int16_t>(std::clamp(scaled, -32767.0f, 32767.0f));
         audio_buffer.emplace_back(sample);

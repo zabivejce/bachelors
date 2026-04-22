@@ -5,11 +5,15 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <cstring>
+#include "SDRParams.hpp"
+#include <chrono>
 class Sender{
     private:
         int listen_sock;
         int conn_sock;
         int port;
+        int sendCnt = 0;
     public:
         Sender(int port)
         {

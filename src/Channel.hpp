@@ -22,6 +22,7 @@ class Channel{
         int decim_cnt;
         float decim_tmp;
         int decimation;
+        float sum_i, sum_q;
 
         Sender* sndr;
         FIRFilter* filter;
@@ -29,7 +30,7 @@ class Channel{
         std::vector<int16_t> audio_buffer;
 
         void mixFreq();
-        float demod();
+        float demod(float i_dem, float q_dem);
         bool decim(float demod, float& audio);
     public:
         Channel(float ch_offset, Sender* sender)
@@ -51,6 +52,7 @@ class Channel{
             std::cout << "after fir\n";
             decimation = (int)(SDRParams::sdr_rate / SDRParams::audio_rate);
             std::cout << decimation << std::endl;
+            audio_buffer.reserve(512);
         }
         bool process(float i_in,float q_in);
 };
