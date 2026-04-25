@@ -21,7 +21,7 @@ void FIRFilter::process(float &i, float &q)
     const float* p_q = &buffer_q[head + 1];
     const float* p_taps = taps.data();
 
-    #pragma omp simd
+    #pragma omp simd reduction(+:out_i, out_q)
     for (int k = 0; k < num_taps; ++k)
     {
         out_i += p_i[k] * p_taps[k];
