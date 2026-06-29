@@ -42,20 +42,20 @@ bool Sender::startServerAccept()
 
     std::cout << "client connected" << std::endl;
 
-    // === PŘIDANÝ KÓD PRO WAV HLAVIČKU ===
+    // === PRIDANY KOD PRO WAV HLAVICKU ===
     uint32_t sample_rate = static_cast<uint32_t>(SDRParams::audio_rate);
     uint16_t channels = 1;         // Mono (podle Channel.cpp)
     uint16_t bits_per_sample = 16; // int16_t (podle Channel.cpp)
 
     uint8_t wav_header[44];
     std::memcpy(wav_header, "RIFF", 4);
-    uint32_t file_size = 0xFFFFFFFF; // Velikost streamu (neznámá/nekonečná)
+    uint32_t file_size = 0xFFFFFFFF;// Velikost streamu infinit
     std::memcpy(wav_header + 4, &file_size, 4);
     std::memcpy(wav_header + 8, "WAVE", 4);
     std::memcpy(wav_header + 12, "fmt ", 4);
-    uint32_t fmt_size = 16;          // Velikost fmt bloku pro PCM
+    uint32_t fmt_size = 16;// Velikost fmt bloku pro PCM
     std::memcpy(wav_header + 16, &fmt_size, 4);
-    uint16_t format = 1;             // 1 = nekomprimované PCM
+    uint16_t format = 1;// 1 = nekomprimovane PCM
     std::memcpy(wav_header + 20, &format, 2);
     std::memcpy(wav_header + 22, &channels, 2);
     std::memcpy(wav_header + 24, &sample_rate, 4);
@@ -65,10 +65,9 @@ bool Sender::startServerAccept()
     std::memcpy(wav_header + 32, &block_align, 2);
     std::memcpy(wav_header + 34, &bits_per_sample, 2);
     std::memcpy(wav_header + 36, "data", 4);
-    uint32_t data_size = 0xFFFFFFFF; // Velikost dat (neznámá/nekonečná)
+    uint32_t data_size = 0xFFFFFFFF; // Velikost dat
     std::memcpy(wav_header + 40, &data_size, 4);
 
-    // Odeslání hlavičky ihned po úspěšném navázání spojení
     send(conn_sock, wav_header, 44, MSG_NOSIGNAL);
     // ====================================
 
@@ -78,8 +77,6 @@ bool Sender::sendData(void* data, long size_data)
 {
     if(conn_sock < 0)
         return false;
-    //ssize_t muze ulozit i -1 [more you know :)]
-    //ssize_t n_bytes = write(conn_sock, data, size_data);
     ssize_t n_bytes = send(conn_sock, data, size_data, MSG_NOSIGNAL);
     if(n_bytes != size_data)
     {

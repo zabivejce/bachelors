@@ -4,13 +4,11 @@ void RadioWorker::threatLoop()
     sender = std::make_unique<Sender>(port);
     if(!sender->startServerAccept())
     {
-        std::cout << "bad\n";
+        std::cout << "server cannot accept client" << std::endl;
         running = false;
         return;
     }
-    std::cout << "helo0\n";
     channel = std::make_unique<Channel>(offset, sender.get());
-    std::cout << "helo1\n";
     while(running)
     {
         std::shared_ptr<IQBlock> block;

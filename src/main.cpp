@@ -121,7 +121,7 @@ void httpServerLoop(int port)
 int main()
 {
     SDRParams::sdr_rate = 2400000;
-    SDRParams::gain = 32000;
+    SDRParams::gain = 100;
     SDRParams::audio_rate = 48000;
     SDRParams::fir_cutoff = 100000;
     std::thread httpThread(httpServerLoop, 8080);
@@ -137,7 +137,6 @@ int main()
     {
         auto block = std::make_shared<IQBlock>();
 
-        // mohlo by byt v intech a ne ve floatech :)
         for(int i = 0; i < SAMPLES_PER_CHUNK; ++i)
         {
             float i_val = ((float)raw_buffer[2*i] - 127.5f) / 127.5f;
@@ -148,8 +147,6 @@ int main()
 
         {
             std::lock_guard<std::mutex> lock(workersMutex);
-            // pres iteratory, protoze je potom mazu
-            // producer -> consumer
             for(auto it = workers.begin(); it != workers.end();)
             {
                 if((*it)->isRunning())
