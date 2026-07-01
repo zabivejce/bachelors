@@ -1,3 +1,0 @@
-/home/jirka/school/bachelors/src/build/CMakeFiles/program.dir
-/home/jirka/school/bachelors/src/build/CMakeFiles/edit_cache.dir
-/home/jirka/school/bachelors/src/build/CMakeFiles/rebuild_cache.dir

@@ -1,1 +1,0 @@
-/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/program.dir/link.d CMakeFiles/program.dir/Channel.cpp.o CMakeFiles/program.dir/FIRFilter.cpp.o CMakeFiles/program.dir/RadioWorker.cpp.o CMakeFiles/program.dir/Sender.cpp.o CMakeFiles/program.dir/main.cpp.o -o program
