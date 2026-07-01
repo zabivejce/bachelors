@@ -19,10 +19,10 @@ class Channel{
         float lpf_q;
         float lpf_alpha;
 
-        int decim_cnt;
-        float decim_tmp;
+        int rf_decim_cnt;
+        int af_decim_cnt;
+        float af_decim_buff;
         int decimation;
-        float sum_i, sum_q;
 
         Sender* sndr;
         FIRFilter* filter;
@@ -42,8 +42,9 @@ class Channel{
             lpf_q = 0.0f;
             phase = 0.0f;
             last_phase = 0.0f;
-            decim_cnt = 0;
-            decim_tmp = 0.0f;
+            rf_decim_cnt = 0;
+            af_decim_cnt = 0;
+            af_decim_buff = 0.0f;
             i = 0.0f; q = 0.0f;
             sndr = sender;
             filter = new FIRFilter();

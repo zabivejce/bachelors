@@ -29,45 +29,36 @@ float Channel::demod(float i_dem, float q_dem)
     last_phase = current_phase;
     return delta;
 }
-bool Channel::decim(float demod, float& audio)
-{
-    decim_tmp += demod;
-    ++decim_cnt;
-    if(decimation <= decim_cnt)
-    {
-        audio = decim_tmp / decimation;
-        decim_cnt = 0;
-        decim_tmp = 0.0;
-        return true;
-    }
-    return false;
-}
 bool Channel::process(float i_in,float q_in)
 {
     i = i_in;
     q = q_in;
     mixFreq();
     filter->process(i, q);
-    float audio;
-    float scaled;
-    ++decim_cnt;
-    sum_i += i;
-    sum_q += q;
+    ++rf_decim_cnt;
 
-    if(decim_cnt >= decimation)
+    if(rf_decim_cnt >= 10) // srazeni na 240kS/s
     {
-        audio = demod(sum_i, sum_q);
-        decim_cnt = 0;
-        sum_i = 0;
-        sum_q = 0;
-        scaled = audio * SDRParams::gain;
-        int16_t sample = static_cast<int16_t>(std::clamp(scaled, -32767.0f, 32767.0f));
-        audio_buffer.emplace_back(sample);
-        if(sndr && audio_buffer.size() >= 512)
+        rf_decim_cnt = 0;
+        float audio = demod(i, q);
+        af_decim_buff += audio;
+        ++af_decim_cnt;
+        if(af_decim_cnt >= 5) // srazeni na 48kS/s
         {
-            bool status = sndr->sendData(audio_buffer.data(),audio_buffer.size() * sizeof(int16_t));
-            audio_buffer.clear();
-            return status;
+            float final_audio = af_decim_buff / 5.0f;
+            af_decim_cnt = 0;
+            af_decim_buff = 0.0f;
+
+            float scaled = final_audio * SDRParams::gain;
+            int16_t sample = static_cast<int16_t>(std::clamp(scaled, -32767.0f, 32767.0f));
+            audio_buffer.emplace_back(sample);
+
+            if(sndr && audio_buffer.size() >= 512)
+            {
+                bool status = sndr->sendData(audio_buffer.data(),audio_buffer.size() * sizeof(int16_t));
+                audio_buffer.clear();
+                return status;
+            }
         }
     }
     return true;

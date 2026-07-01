@@ -42,6 +42,9 @@ bool Sender::startServerAccept()
 
     std::cout << "client connected" << std::endl;
 
+    const char* http_hdr = "HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nConnection: close\r\n\r\n";
+    sendData((void*)http_hdr, strlen(http_hdr));
+
     // === PRIDANY KOD PRO WAV HLAVICKU ===
     uint32_t sample_rate = static_cast<uint32_t>(SDRParams::audio_rate);
     uint16_t channels = 1;         // Mono (podle Channel.cpp)
@@ -49,7 +52,7 @@ bool Sender::startServerAccept()
 
     uint8_t wav_header[44];
     std::memcpy(wav_header, "RIFF", 4);
-    uint32_t file_size = 0xFFFFFFFF;// Velikost streamu infinit
+    uint32_t file_size = 0xFFFFFFFF;// Velikost streamu 4GiB vystaci na 12h prehravani
     std::memcpy(wav_header + 4, &file_size, 4);
     std::memcpy(wav_header + 8, "WAVE", 4);
     std::memcpy(wav_header + 12, "fmt ", 4);
@@ -65,24 +68,30 @@ bool Sender::startServerAccept()
     std::memcpy(wav_header + 32, &block_align, 2);
     std::memcpy(wav_header + 34, &bits_per_sample, 2);
     std::memcpy(wav_header + 36, "data", 4);
-    uint32_t data_size = 0xFFFFFFFF; // Velikost dat
+    uint32_t data_size = 0xFFFFFFFF;
     std::memcpy(wav_header + 40, &data_size, 4);
-
-    send(conn_sock, wav_header, 44, MSG_NOSIGNAL);
     // ====================================
-
+    sendData(wav_header, 44);
     return true;
 }
 bool Sender::sendData(void* data, long size_data)
 {
     if(conn_sock < 0)
         return false;
-    ssize_t n_bytes = send(conn_sock, data, size_data, MSG_NOSIGNAL);
-    if(n_bytes != size_data)
+    long total_sent = 0;
+    char* buf = static_cast<char*>(data);
+    while(total_sent < size_data)
     {
-        std::cout << "client disconnected" << std::endl;
-        close(conn_sock);
-        return false;
+        ssize_t n_bytes = send(conn_sock, buf + total_sent, size_data - total_sent, MSG_NOSIGNAL);
+
+        if(n_bytes <= 0)
+        {
+            std::cout << "client disconnected" << std::endl;
+            close(conn_sock);
+            conn_sock = -1;
+            return false;
+        }
+        total_sent += n_bytes;
     }
     return true;
 }

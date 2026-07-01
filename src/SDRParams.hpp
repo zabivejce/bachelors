@@ -1,8 +1,9 @@
 #pragma once
 class SDRParams{
     public:
-        inline static float sdr_rate = 2048000;
-        inline static float audio_rate = 48000;
-        inline static float gain = 1;
-        inline static float fir_cutoff = 100000;
+        inline static float sdr_rate;
+        inline static float audio_rate;
+        inline static float gain;
+        inline static float fir_cutoff;
+        inline static float sdr_center_freq;
 };

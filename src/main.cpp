@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <string>
 #include <thread>
 #include <vector>
 #include <stdexcept>
@@ -25,32 +26,15 @@
 #include "Sender.hpp"
 #include "RadioWorker.hpp"
 /*
-https://k3xec.com/packrat-processing-iq/
-https://htorp.folk.ntnu.no/Undervisning/TTK10/IQdemodulation.pdf
-https://en.wikipedia.org/wiki/In-phase_and_quadrature_components
+    100.5
+    101.1
+    101.4
 */
-/*
-na raw posilani dat do 
-    rtl_sdr -f 101.1M -s 2.4M - | ./program | aplay -r 48000 -f S16_LE -c 1
-*/
-/*
-hlavni vlakno hazi ostatnim vlaknu (workerum) IQ samply
-Sender je primo im plementovany do Channel nebo je sam?
-Sender bude promo ve vlakne s channelem (urcite)
-po ukonceni poslechu se vlakno ukonci
-OTAZKY:
-    jak se bude spawnovat nove vlakno?
-        hlavni vlakno bude na portu 80 a bude prijimat HTTP request?
-        hlavni vlakno potom spawne nove vlakno s posunutim?
-*/
-
-//const int sdr_rate = 2048000;
-//const int audio_rate = 48000;
-//const int decimation = sdr_rate / audio_rate;
-//const int gain = 32000;
-
 std::vector<std::shared_ptr<RadioWorker>> workers;
 std::mutex workersMutex;
+
+const float BASE_CENTER_FREQ = 100.0f;
+int next_stream_port = 9001;
 
 void httpServerLoop(int port)
 {
@@ -63,13 +47,9 @@ void httpServerLoop(int port)
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(port);
     
-    if(bind(srv_sock, (struct sockaddr*)&addr, sizeof(addr)) < 0)
-    {
-        std::cerr << "HTTP Server: Bind failed on port " << port << std::endl;
-        return;
-    }
+    bind(srv_sock, (struct sockaddr*)&addr, sizeof(addr));
     listen(srv_sock, 5);
-    std::cout << "HTTP Server listening on port " << port << std::endl;
+    std::cout << "Main API runs on port " << port << " (VLC example: http://127.0.0.1:" << port << "/101.1)" << std::endl;
 
     while(true)
     {
@@ -79,51 +59,134 @@ void httpServerLoop(int port)
         if (cli_sock < 0) continue;
 
         char buffer[1024] = {0};
-        read(cli_sock, buffer, 1024);
+        int bytes_read = read(cli_sock, buffer, 1023);
+        if (bytes_read <= 0)
+        {
+            close(cli_sock);
+            continue;
+        }
+        
         std::string request(buffer);
         
-        std::string response = "HTTP/1.1 400 Bad Request\r\n\r\n";
+        std::string host_ip = "127.0.0.1";//fallback
+        size_t host_pos = request.find("Host: ");
+        if(host_pos == std::string::npos) host_pos = request.find("host: ");
         
-        // parsing: GET /start?port=1234&offset=50000
-        if(request.find("GET") == 0)
+        if(host_pos != std::string::npos)
         {
-            int new_port = 0;
-            float new_offset = 0.0f;
-            
-            size_t pos_port = request.find("port=");
-            size_t pos_off = request.find("offset=");
-            
-            if(pos_port != std::string::npos && pos_off != std::string::npos)
+            host_pos += 6; // "Host: " skip
+            size_t host_end = request.find("\r\n", host_pos);
+            if(host_end != std::string::npos)
             {
-                new_port = std::stoi(request.substr(pos_port + 5));
-                new_offset = std::stof(request.substr(pos_off + 7));
+                std::string full_host = request.substr(host_pos, host_end - host_pos);
                 
-                std::cout << "HTTP: Spawning worker on port " << new_port << ", offset " << new_offset << std::endl;
-                
-                auto worker = std::make_shared<RadioWorker>(new_port, new_offset);
-                worker->start();
-                
+                size_t colon_pos = full_host.find(":");
+                if(colon_pos != std::string::npos)
                 {
-                    std::lock_guard<std::mutex> lock(workersMutex);
-                    workers.push_back(worker);
+                    host_ip = full_host.substr(0, colon_pos);
                 }
-                
-                response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nWorker started.\n";
+                else
+                {
+                    host_ip = full_host;
+                }
             }
         }
         
-        write(cli_sock, response.c_str(), response.length());
+        size_t first_line_end = request.find("\r\n");
+        if (first_line_end != std::string::npos)
+        {
+            std::string first_line = request.substr(0, first_line_end);
+            
+            if(first_line.find("GET /") == 0)
+            {
+                size_t start = 5; 
+                size_t end = first_line.find(" ", start); 
+                
+                if(end != std::string::npos && end > start)
+                {
+                    std::string freq_str = first_line.substr(start, end - start);
+                    
+                    try
+                    {
+                        float target_freq = std::stof(freq_str);
+                        float offset_hz = (target_freq - SDRParams::sdr_center_freq) * 1000000.0f;
+
+                        if(offset_hz < -(SDRParams::sdr_rate / 2.0f) || offset_hz > (SDRParams::sdr_rate / 2.0f)){throw std::out_of_range("Out of range of RTL-SDR tuner");}
+                        
+                        int stream_port = next_stream_port;
+                        ++next_stream_port;
+                        
+                        auto worker = std::make_shared<RadioWorker>(stream_port, offset_hz);
+                        worker->start();
+                        {
+                            std::lock_guard<std::mutex> lock(workersMutex);
+                            workers.push_back(worker);
+                        }
+                        //redirect on different port
+                        //https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/302
+                        std::string resp = "HTTP/1.1 302 Found\r\nLocation: http://" + host_ip + ":" + std::to_string(stream_port) + "\r\nConnection: close\r\n\r\n";
+                        write(cli_sock, resp.c_str(), resp.length());
+                    }
+                    //Out of range catch
+                    //https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/416
+                    catch(const std::out_of_range& e)
+                    {
+                        std::cout << "Failed: " << e.what() << std::endl;
+                        std::string resp = "HTTP/1.1 416 Range Not Satisfiable\r\n\r\n";
+                        write(cli_sock, resp.c_str(), resp.length());
+                        
+                    }
+                    //other catch
+                    catch(...)
+                    {
+                        std::string resp = "HTTP/1.1 400 Bad Request\r\n\r\n";
+                        write(cli_sock, resp.c_str(), resp.length());
+                    }
+                }
+            }
+        }
         close(cli_sock);
     }
-    close(srv_sock);
 }
 
-int main()
+void help(const char* prog)
 {
+    std::cerr << "Usage: " << prog << " <center_frequency>\n\n"
+              << "Example:\n"
+              << "\t" << prog << " 100.0\n"
+              << "\t" << prog << " 101.1\n\n"
+              << "Description:\n"
+              << "\tThis parameter defines the center frequency in MHz tuned on the RTL-SDR hardware.\n"
+              << "\tThe program expects I/Q data on the standard input (stdin).\n"
+              << "\tThe program expects 2.4 MS/s.\n\n"
+              << "Complete example using a pipe:\n"
+              << "\trtl_sdr -f 100.0M -s 2.4M - | " << prog << " 100.0\n";
+}
+
+int main(int argc, char* argv[])
+{
+    if(argc != 2 || std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")
+    {
+        help(argv[0]);
+        return 1;
+    }
+
+    try
+    {
+        SDRParams::sdr_center_freq = std::stof(argv[1]);
+        std::cout << "[INFO] Center frequency set to: " << SDRParams::sdr_center_freq << " MHz\n";
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "[ERROR] Invalid frequency format. Please use format like 100.0 or 101.1\n";
+        return 1;
+    }
+
     SDRParams::sdr_rate = 2400000;
-    SDRParams::gain = 100;
+    SDRParams::gain = 10000;
     SDRParams::audio_rate = 48000;
     SDRParams::fir_cutoff = 100000;
+    SDRParams::gain = 100000;
     std::thread httpThread(httpServerLoop, 8080);
     httpThread.detach();
 
@@ -131,8 +194,8 @@ int main()
     uint8_t raw_buffer[SAMPLES_PER_CHUNK * 2]; 
 
     std::cout << "Core system started. Feed IQ data to stdin..." << std::endl;
-    std::cout << "Use HTTP to spawn workers: curl 'http://localhost:8080/start?port=8008&offset=-200000'" << std::endl;
 
+    //distribution of IQ blocks
     while(std::cin.read(reinterpret_cast<char*>(raw_buffer), sizeof(raw_buffer)))
     {
         auto block = std::make_shared<IQBlock>();
