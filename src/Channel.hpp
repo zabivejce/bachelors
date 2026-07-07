@@ -25,8 +25,11 @@ class Channel{
         float af_decim_buff;
         int decimation;
 
+        float deemph_y = 0.0f;
+
         Sender* sndr;
-        std::unique_ptr<FIRFilter> filter;
+        std::unique_ptr<FIRFilter> IQfilter;
+        std::unique_ptr<FIRFilter> audio_filter;
 
         std::vector<int16_t> audio_buffer;
 
@@ -48,7 +51,8 @@ class Channel{
             af_decim_buff = 0.0f;
             i = 0.0f; q = 0.0f;
             sndr = sender;
-            filter = std::make_unique<FIRFilter>();
+            IQfilter = std::make_unique<FIRFilter>(SDRParams::fir_cutoff, SDRParams::sdr_rate);
+            audio_filter = std::make_unique<FIRFilter>(15000.0f, 240000.0f);// cutoff 15kHz, cut 19kHz pilot and above
             decimation = (int)(SDRParams::sdr_rate / SDRParams::audio_rate);
             audio_buffer.reserve(512);
         }

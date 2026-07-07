@@ -248,10 +248,9 @@ int main(int argc, char* argv[])
     }
 
     SDRParams::sdr_rate = 2400000;
-    SDRParams::gain = 10000;
     SDRParams::audio_rate = 48000;
     SDRParams::fir_cutoff = 100000;
-    SDRParams::gain = 100000;
+    SDRParams::gain = 10000;
     std::thread httpThread(httpServerLoop, 8080);
     httpThread.detach();
 

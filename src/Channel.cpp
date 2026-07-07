@@ -34,22 +34,20 @@ bool Channel::process(float i_in,float q_in)
     i = i_in;
     q = q_in;
     mixFreq();
-    filter->process(i, q);
+    IQfilter->process(i, q);
     ++rf_decim_cnt;
 
     if(rf_decim_cnt >= 10) // srazeni na 240kS/s
     {
         rf_decim_cnt = 0;
         float audio = demod(i, q);
-        af_decim_buff += audio;
+        audio_filter->process(audio);
         ++af_decim_cnt;
         if(af_decim_cnt >= 5) // srazeni na 48kS/s
         {
-            float final_audio = af_decim_buff / 5.0f;
             af_decim_cnt = 0;
-            af_decim_buff = 0.0f;
 
-            float scaled = final_audio * SDRParams::gain;
+            float scaled = audio * SDRParams::gain;
             int16_t sample = static_cast<int16_t>(std::clamp(scaled, -32767.0f, 32767.0f));
             audio_buffer.emplace_back(sample);
 
