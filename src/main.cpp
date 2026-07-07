@@ -28,6 +28,7 @@
 #include "Sender.hpp"
 #include "RadioWorker.hpp"
 /*
+    test stations (these are close enough)
     100.5
     101.1
     101.4
@@ -170,9 +171,14 @@ void httpServerLoop(int port)
                         if(offset_hz < -(SDRParams::sdr_rate / 2.0f) || offset_hz > (SDRParams::sdr_rate / 2.0f)){throw std::out_of_range("Out of range of RTL-SDR tuner");}
                         
                         auto worker = std::make_shared<RadioWorker>(offset_hz);
-                        std::cout << "before" << std::endl;
                         int stream_port = worker->initNetwork();
-                        std::cout << "after" << std::endl;
+                        if(stream_port <= 0)
+                        {
+                            std::string err_resp = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
+                            sendFullString(cli_sock, err_resp);
+                            close(cli_sock);
+                            continue;
+                        }
                         worker->start();
                         {
                             std::lock_guard<std::mutex> lock(workersMutex);

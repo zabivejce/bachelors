@@ -27,10 +27,18 @@ class RadioWorker
 
         void threatLoop();
     public:
-        RadioWorker(float offset) : offset(offset), running(true) {}
+        RadioWorker(float offset) : offset(offset), running(true)
+        {
+            sender = std::make_unique<Sender>();
+            channel = std::make_unique<Channel>(offset,sender.get());
+        }
         bool isRunning() {return running;}
         void start() {workerThread = std::thread(&RadioWorker::threatLoop, this);}
         void stop();
         void pushData(const std::shared_ptr<IQBlock>& block);
-        int initNetwork(){return sender->initServer();}
+        int initNetwork()
+        {
+            port = sender->initServer();
+            return port;
+        }
 };

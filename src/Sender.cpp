@@ -5,23 +5,39 @@ int Sender::initServer()
 {
     srv_sock = socket(AF_INET, SOCK_STREAM, 0);
     if(srv_sock < 0)
+    {
+        std::cerr << "[ERROR] Sender socket() failed" << std::endl;
         return -1;
+    }
 
     struct sockaddr_in addr;
+    std::memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
 
     addr.sin_port = htons(0); //OS will choose
 
     if(bind(srv_sock, (struct sockaddr*)&addr, sizeof(addr)) < 0)
-        return -1; // bind failed
+    {
+        std::cerr << "[ERROR] Sender bind() failed" << std::endl;
+        close(srv_sock);
+        return -1;
+    }
 
     if(listen(srv_sock, 5) < 0)
+    {
+        std::cerr << "[ERROR] Sender listen() failed" << std::endl;
+        close(srv_sock);
         return -1;
+    }
 
     socklen_t len = sizeof(addr);
-    if(getsockname(srv_sock, (struct sockaddr*)&addr,&len) == -1)
+    if(getsockname(srv_sock, (struct sockaddr*)&addr, &len) == -1)
+    {
+        std::cerr << "[ERROR] Sender getsockname() failed" << std::endl;
+        close(srv_sock);
         return -1;
+    }
 
     ass_port = ntohs(addr.sin_port);
 
