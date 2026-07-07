@@ -2,8 +2,10 @@
 #include <asm-generic/socket.h>
 #include <cmath>
 #include <condition_variable>
+#include <cstddef>
 #include <cstdlib>
 #include <iostream>
+#include <cstdio>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -257,10 +259,21 @@ int main(int argc, char* argv[])
     const int SAMPLES_PER_CHUNK = 1024;
     uint8_t raw_buffer[SAMPLES_PER_CHUNK * 2]; 
 
-    std::cout << "Core system started. Feed IQ data to stdin..." << std::endl;
+    std::string cmd = "rtl_sdr -f " + std::string(argv[1]) + "M -s 2.4M -";
+    std::cout << "[INFO] starting rtl_sdr process: " << cmd << std::endl;
 
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) 
+    {
+        std::cerr << "[FATAL ERROR] Cannot run rtl_sdr. Is rtl_sdr installed?" << std::endl;
+        return 1;
+    }
+
+    std::cout << "Core system started. Reading IQ data from RTL-SDR sub-process..." << std::endl;
+
+    size_t bytes_read;
     //distribution of IQ blocks
-    while(std::cin.read(reinterpret_cast<char*>(raw_buffer), sizeof(raw_buffer)))
+    while((bytes_read = fread(raw_buffer, 1, sizeof(raw_buffer), pipe)) > 0)
     {
         auto block = std::make_shared<IQBlock>();
 
@@ -297,5 +310,6 @@ int main(int argc, char* argv[])
             w->stop();
     }
     
+    pclose(pipe);
     return 0;
 }
