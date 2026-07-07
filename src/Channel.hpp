@@ -4,6 +4,7 @@
 #include "SDRParams.hpp"
 #include <cmath>
 #include <algorithm>
+#include <memory>
 #include <vector>
 class Channel{
     private:
@@ -25,7 +26,7 @@ class Channel{
         int decimation;
 
         Sender* sndr;
-        FIRFilter* filter;
+        std::unique_ptr<FIRFilter> filter;
 
         std::vector<int16_t> audio_buffer;
 
@@ -47,7 +48,7 @@ class Channel{
             af_decim_buff = 0.0f;
             i = 0.0f; q = 0.0f;
             sndr = sender;
-            filter = new FIRFilter();
+            filter = std::make_unique<FIRFilter>();
             decimation = (int)(SDRParams::sdr_rate / SDRParams::audio_rate);
             audio_buffer.reserve(512);
         }

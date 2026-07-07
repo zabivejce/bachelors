@@ -4,6 +4,7 @@
 #include <mutex>
 #include <queue>
 #include <condition_variable>
+#include <atomic>
 #include "SDRParams.hpp"
 #include "IQBlock.hpp"
 #include "Sender.hpp"
@@ -13,7 +14,7 @@ class RadioWorker
     private:
         int port;
         int offset;
-        bool running;
+        std::atomic<bool> running{true}; // resolved issue with data race
         std::unique_ptr<Sender> sender;
         std::unique_ptr<Channel> channel;
         std::thread workerThread;
@@ -26,9 +27,10 @@ class RadioWorker
 
         void threatLoop();
     public:
-        RadioWorker(int port, float offset) : port(port), offset(offset), running(true) {}
+        RadioWorker(float offset) : offset(offset), running(true) {}
         bool isRunning() {return running;}
         void start() {workerThread = std::thread(&RadioWorker::threatLoop, this);}
         void stop();
         void pushData(const std::shared_ptr<IQBlock>& block);
+        int initNetwork(){return sender->initServer();}
 };

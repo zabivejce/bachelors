@@ -26,7 +26,7 @@ The project uses CMake for building. Run the following commands in the project r
 
     mkdir build
     cd build
-    cmake ..
+    cmake ../src
     make -j$(nproc)
 
 ## Running the Server

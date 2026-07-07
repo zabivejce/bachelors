@@ -1,8 +1,8 @@
 #include "RadioWorker.hpp"
 void RadioWorker::threatLoop()
 {
-    sender = std::make_unique<Sender>(port);
-    if(!sender->startServerAccept())
+    sender = std::make_unique<Sender>();
+    if(!sender->startServerAccept(running))
     {
         std::cout << "server cannot accept client" << std::endl;
         running = false;

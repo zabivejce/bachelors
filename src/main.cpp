@@ -2,10 +2,12 @@
 #include <asm-generic/socket.h>
 #include <cmath>
 #include <condition_variable>
+#include <cstdlib>
 #include <iostream>
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <ostream>
 #include <queue>
 #include <string>
 #include <thread>
@@ -33,8 +35,24 @@
 std::vector<std::shared_ptr<RadioWorker>> workers;
 std::mutex workersMutex;
 
-const float BASE_CENTER_FREQ = 100.0f;
-int next_stream_port = 9001;
+bool sendFullString(int sock, const std::string& data) 
+{
+    size_t total_sent = 0;
+    const char* buf = data.c_str();
+    size_t size_data = data.length();
+
+    while (total_sent < size_data) 
+    {
+        ssize_t n_bytes = send(sock, buf + total_sent, size_data - total_sent, MSG_NOSIGNAL);
+        
+        if (n_bytes <= 0) 
+        {
+            return false;// connection error
+        }
+        total_sent += n_bytes;
+    }
+    return true;
+}
 
 void httpServerLoop(int port)
 {
@@ -47,8 +65,18 @@ void httpServerLoop(int port)
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(port);
     
-    bind(srv_sock, (struct sockaddr*)&addr, sizeof(addr));
-    listen(srv_sock, 5);
+    if(bind(srv_sock, (struct sockaddr*)&addr, sizeof(addr)) < 0)
+    {
+        std::cerr << "ERROR: port 8080 is reserved."<< std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    if(listen(srv_sock, 5) < 0)
+    {
+        std::cerr << "ERROR: listen failed. Cannot create queue for connection." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
     std::cout << "Main API runs on port " << port << " (VLC example: http://127.0.0.1:" << port << "/101.1)" << std::endl;
 
     while(true)
@@ -58,15 +86,43 @@ void httpServerLoop(int port)
         int cli_sock = accept(srv_sock, (struct sockaddr*)&cli_addr, &len);
         if (cli_sock < 0) continue;
 
+        std::string request;
         char buffer[1024] = {0};
-        int bytes_read = read(cli_sock, buffer, 1023);
-        if (bytes_read <= 0)
+        bool header_complete = false;
+
+        while(!header_complete && request.length() < 8192) // safety size 8kiB
         {
+            int bytes_read = read(cli_sock, buffer, sizeof(buffer) - 1);
+
+            if(bytes_read > 0)
+            {
+                buffer[bytes_read] = '\0';
+                request += buffer;
+
+                if(request.find("\r\n\r\n") != std::string::npos)
+                    header_complete = true;
+            }
+            else
+            {
+                break; // connection error
+            }
+        }
+
+        if(!header_complete)
+        {
+            std::string err_resp = "HTTP/1.1 400 Bad Request\r\n\r\n";
+            sendFullString(cli_sock,err_resp);
             close(cli_sock);
             continue;
         }
-        
-        std::string request(buffer);
+
+        if(request.substr(0,4) != "GET ")
+        {
+            std::string err_resp = "HTTP/1.1 405 Method Not Allowed\r\n\r\n";
+            sendFullString(cli_sock, err_resp);
+            close(cli_sock);
+            continue;
+        }
         
         std::string host_ip = "127.0.0.1";//fallback
         size_t host_pos = request.find("Host: ");
@@ -113,19 +169,20 @@ void httpServerLoop(int port)
 
                         if(offset_hz < -(SDRParams::sdr_rate / 2.0f) || offset_hz > (SDRParams::sdr_rate / 2.0f)){throw std::out_of_range("Out of range of RTL-SDR tuner");}
                         
-                        int stream_port = next_stream_port;
-                        ++next_stream_port;
-                        
-                        auto worker = std::make_shared<RadioWorker>(stream_port, offset_hz);
+                        auto worker = std::make_shared<RadioWorker>(offset_hz);
+                        std::cout << "before" << std::endl;
+                        int stream_port = worker->initNetwork();
+                        std::cout << "after" << std::endl;
                         worker->start();
                         {
                             std::lock_guard<std::mutex> lock(workersMutex);
                             workers.push_back(worker);
                         }
-                        //redirect on different port
+                        //redirect to different port
                         //https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/302
                         std::string resp = "HTTP/1.1 302 Found\r\nLocation: http://" + host_ip + ":" + std::to_string(stream_port) + "\r\nConnection: close\r\n\r\n";
-                        write(cli_sock, resp.c_str(), resp.length());
+                        sendFullString(cli_sock, resp);
+                        //write(cli_sock, resp.c_str(), resp.length());
                     }
                     //Out of range catch
                     //https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/416
@@ -133,14 +190,16 @@ void httpServerLoop(int port)
                     {
                         std::cout << "Failed: " << e.what() << std::endl;
                         std::string resp = "HTTP/1.1 416 Range Not Satisfiable\r\n\r\n";
-                        write(cli_sock, resp.c_str(), resp.length());
+                        sendFullString(cli_sock,resp);
+                        //write(cli_sock, resp.c_str(), resp.length());
                         
                     }
                     //other catch
                     catch(...)
                     {
                         std::string resp = "HTTP/1.1 400 Bad Request\r\n\r\n";
-                        write(cli_sock, resp.c_str(), resp.length());
+                        sendFullString(cli_sock, resp);
+                        //write(cli_sock, resp.c_str(), resp.length());
                     }
                 }
             }

@@ -1,7 +1,9 @@
 #pragma once
+#include <atomic>
 #include <sys/socket.h>
 #include <iostream>
 #include <netinet/in.h>
+#include <poll.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -9,23 +11,24 @@
 #include "SDRParams.hpp"
 class Sender{
     private:
-        int listen_sock;
+        int srv_sock;
         int conn_sock;
-        int port;
+        int ass_port;
     public:
-        Sender(int port)
+        Sender()
         {
-            listen_sock = -1;
+            srv_sock = -1;
             conn_sock = -1;
-            this->port = port;
+            ass_port = -1;
         }
         ~Sender()
         {
             if(conn_sock >= 0)
                 close(conn_sock);
-            if(listen_sock >= 0)
-                close(listen_sock);
+            if(srv_sock >= 0)
+                close(srv_sock);
         }
-        bool startServerAccept();
+        int initServer();
+        bool startServerAccept(std::atomic<bool>& isRunning);
         bool sendData(void* data, long size_data);
 };
