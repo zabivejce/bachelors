@@ -14,12 +14,15 @@ class Sender{
         int srv_sock;
         int conn_sock;
         int ass_port;
+        const int MAX_TIMEOUTS = 3;
+        int timeout_counter;
     public:
         Sender()
         {
             srv_sock = -1;
             conn_sock = -1;
             ass_port = -1;
+            timeout_counter = 0;
         }
         ~Sender()
         {

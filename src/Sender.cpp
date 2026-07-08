@@ -103,7 +103,13 @@ bool Sender::startServerAccept(std::atomic<bool>& isRunning)
         }
         else if(poll_res == 0)
         {
-            continue; //noone connected, retry
+            if(timeout_counter >= MAX_TIMEOUTS)
+            {
+                std::cout << "[WARNING] Client [" << ass_port << "] did not connected after " << MAX_TIMEOUTS << " tries. Releasing port." << std::endl;
+                return false; // fail after 3 retrys
+            }
+            ++timeout_counter;
+            continue; //no one connected, retry
         }
         else
         {
