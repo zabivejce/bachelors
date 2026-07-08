@@ -223,11 +223,11 @@ void help(const char* prog)
               << "\t" << prog << " 100.0\n"
               << "\t" << prog << " 101.1\n\n"
               << "Description:\n"
-              << "\tThis parameter defines the center frequency in MHz tuned on the RTL-SDR hardware.\n"
-              << "\tThe program expects I/Q data on the standard input (stdin).\n"
-              << "\tThe program expects 2.4 MS/s.\n\n"
-              << "Complete example using a pipe:\n"
-              << "\trtl_sdr -f 100.0M -s 2.4M - | " << prog << " 100.0\n";
+              << "\tThis parameter defines the center frequency in MHz to be tuned on the RTL-SDR hardware.\n"
+              << "\tThe program automatically spawns the rtl_sdr sub-process in the background\n"
+              << "\tand processes the data at a sample rate of 2.4 MS/s.\n\n"
+              << "Complete example:\n"
+              << "\t" << prog << " 100.0\n";
 }
 
 int main(int argc, char* argv[])
