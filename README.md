@@ -30,16 +30,18 @@ The project uses CMake for building. Run the following commands in the project r
     make -j$(nproc)
 
 ## Running the Server
-The application reads raw 8-bit unsigned I/Q data from the standard input (`stdin`). You need to pipe the output of the `rtl_sdr` tool directly into the application.
+The application is a fully independent server that automatically manages the SDR hardware. It internally spawns the `rtl_sdr` sub-process to read the raw 8-bit unsigned I/Q data, so no manual pipeline setup is required.
 
 **Usage:**
 
     ./program <center_frequency_MHz>
 
 **Complete Example:**
-Tune the RTL-SDR to 100.0 MHz with a sample rate of 2.4 MS/s, and start the streaming server:
+To tune the RTL-SDR to a center frequency of 100.0 MHz (with an automatic sample rate of 2.4 MS/s) and start the HTTP dispatcher, simply run:
 
-    rtl_sdr -f 100.0M -s 2.4M - | ./program 100.0
+    ./program 100.0
+
+The server will automatically start receiving data and listening for client connections on port `8080`. You can stop the server at any time by pressing `Ctrl+C` (Graceful Shutdown).
 
 ## Listening to a Station
 Once the server is running, the main API listens on port `8080`. 
